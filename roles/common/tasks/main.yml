@@ -148,7 +148,7 @@
     state: started
     enabled: yes
 
-#----Harden the default sshd configuration----
+#----Harden the default sshd configuration and block off-campus IPs----
 
 - name: Secure SSH installation
   lineinfile:
@@ -181,21 +181,30 @@
       line: 'AddressFamily inet'
   notify: restart sshd
 
-#----Enable and configure ntpd----
-
-- name: Open necessary firewall ports for external ntp connections (permanent)
+- name: Remove default ssh service from public zone
   firewalld:
     zone: public
-    service: ntp
+    service: ssh
+    state: disabled
+    permanent: true
+    immediate: true
+
+- name: Add rich rule to allow ssh connections only from 134.117.0.0/16 IPs
+  firewalld:
+    rich_rule: 'rule family="ipv4" source address="134.117.0.0/16" service name="ssh" accept'
     state: enabled
     permanent: true
+    immediate: true
+
+#----Enable and configure ntpd----
 
 - name: Open necessary firewall ports for external ntp connections
   firewalld:
     zone: public
     service: ntp
     state: enabled
-    permanent: false
+    permanent: true
+    immediate: true
 
 - name: Copy ntpd.conf
   copy:
