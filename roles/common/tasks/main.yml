@@ -1,0 +1,240 @@
+---
+# Common configuration options for all nodes
+
+#----Install packages----
+
+- name: Install vim
+  yum:
+    name: vim
+    state: present
+
+- name: Install tree
+  yum:
+    name: tree
+    state: present
+
+- name: Install rngd
+  yum:
+    name: rng-tools
+    state: present
+
+- name: Install mailx
+  yum:
+    name: mailx
+    state: present
+
+- name: Install ntpd
+  yum:
+    name: ntp
+    state: present
+
+#----Disable services----
+
+- name: Disable postfix
+  service:
+    name: postfix
+    state: stopped
+    enabled: no
+
+#----Enable services----
+
+- name: Enable rngd
+  service:
+    name: rngd
+    state: started
+    enabled: yes
+
+#----Network configuration----
+
+- name: Turn off IPv6 using sysctl (all)
+  sysctl:
+    name: net.ipv6.conf.all.disable_ipv6
+    value: 1
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Turn off IPv6 using sysctl (default)
+  sysctl:
+    name: net.ipv6.conf.default.disable_ipv6
+    value: 1
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Turn off secure ICMP redirects (all)
+  sysctl:
+    name: net.ipv4.conf.all.secure_redirects
+    value: 0
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Turn off secure ICMP redirects (default)
+  sysctl:
+    name: net.ipv4.conf.all.secure_redirects
+    value: 0
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Increase the maxiumum number of open file descriptors
+  sysctl:
+    name: fs.file-max
+    value: 128000
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Increase socket buffer max size (read)
+  sysctl:
+    name: net.core.rmem_max
+    value: 851968
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Increase socket buffer max size (write)
+  sysctl:
+    name: net.core.wmem_max
+    value: 851968
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Increase the backlog buffer for sockets
+  sysctl:
+    name: net.core.netdev_max_backlog
+    value: 5000
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Increase the backlog buffer for tcp syn
+  sysctl:
+    name: net.ipv4.tcp_max_syn_backlog
+    value: 1024
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Increase the backlog buffer for completed connections
+  sysctl:
+    name: net.core.somaxconn
+    value: 1024
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Turn off the slow start congestion control algo for idle connections
+  sysctl:
+    name: net.ipv4.tcp_slow_start_after_idle
+    value: 0
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Log packets from mars
+  sysctl:
+    name: net.ipv4.conf.all.log_martians
+    value: 1
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Ensure firewalld is running
+  service:
+    name: firewalld
+    state: started
+    enabled: yes
+
+#----Harden the default sshd configuration----
+
+- name: Secure SSH installation
+  lineinfile:
+    dest: /etc/ssh/sshd_config
+    backup: "{{item.backup}}"
+    regexp: "{{item.regexp}}"
+    line: "{{item.line}}"
+    backrefs: true
+  with_items:
+    # On first loop of lineinfile, make a backup of the original system file.
+    # Don't allow root to login
+    - regexp: '^#PermitRootLogin'
+      backup: true
+      line: 'PermitRootLogin no'
+    # Reduce the grace time for logins
+    - regexp: '^#LoginGraceTime'
+      backup: false
+      line: 'LoginGraceTime 30'
+    # Don't allow password authentication
+    - regexp:  '^PasswordAuthentication yes'
+      backup: false
+      line: 'PasswordAuthentication no'
+    # Turn off GSSAPIAuthentication
+    - regexp: '^GSSAPIAuthentication yes'
+      backup: false
+      line: 'GSSAPIAuthentication no'
+    # Only allow ipv4
+    - regexp: '^#AddressFamily any'
+      backup: false
+      line: 'AddressFamily inet'
+  notify: restart sshd
+
+#----Add users and public keys----
+
+- name: Add Kevin user to hosts
+  user:
+    name: kevin
+    groups: wheel
+    append: yes
+    comment: 'Kevin Bowrin'
+
+- name: Install Kevin's public key into authorized_keys
+  authorized_key:
+    user: kevin
+    state: present
+    key: "{{ lookup('file', 'kevin_pub_key.pub')}}"
+
+#----Enable and configure ntpd----
+
+- name: Open necessary firewall ports for external ntp connections (permanent)
+  firewalld:
+    zone: public
+    service: ntp
+    state: enabled
+    permanent: true
+
+- name: Open necessary firewall ports for external ntp connections
+  firewalld:
+    zone: public
+    service: ntp
+    state: enabled
+    permanent: false
+
+- name: Copy ntpd.conf
+  copy:
+    src: ntp.conf
+    dest: /etc/ntp.conf
+    backup: yes
+    mode: 0444
+    owner: root
+    group: root
+    force: yes
+  notify: restart ntpd
+
+- name: Start the ntp service
+  service:
+    name: ntpd
+    state: started
+    enabled: true
+
+- name: Add logrotate conf for ntpd
+  copy:
+    src: ntplogrotate
+    dest: /etc/logrotate.d/
+    owner: root
+    group: root
+    mode: 0444
+    force: yes
+    backup: yes
