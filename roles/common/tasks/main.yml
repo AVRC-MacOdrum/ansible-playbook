@@ -181,21 +181,6 @@
       line: 'AddressFamily inet'
   notify: restart sshd
 
-#----Add users and public keys----
-
-- name: Add Kevin user to hosts
-  user:
-    name: kevin
-    groups: wheel
-    append: yes
-    comment: 'Kevin Bowrin'
-
-- name: Install Kevin's public key into authorized_keys
-  authorized_key:
-    user: kevin
-    state: present
-    key: "{{ lookup('file', 'kevin_pub_key.pub')}}"
-
 #----Enable and configure ntpd----
 
 - name: Open necessary firewall ports for external ntp connections (permanent)
@@ -238,3 +223,31 @@
     mode: 0444
     force: yes
     backup: yes
+
+#----Add users and public keys----
+
+- name: Add user Kevin
+  user:
+    name: kevin
+    groups: wheel
+    append: yes
+    comment: 'Kevin Bowrin'
+
+- name: Install Kevin's public key into authorized_keys
+  authorized_key:
+    user: kevin
+    state: present
+    key: "{{ lookup('file', 'kevin_pub_key.pub')}}"
+
+- name: Add user Adam
+  user:
+    name: adam
+    groups: wheel
+    append: yes
+    comment: 'Adam Milling'
+
+- name: Install Adam's public key into authorized_keys
+  authorized_key:
+    user: adam
+    state: present
+    key: "{{ lookup('file', 'adam_pub_key.pub')}}"
