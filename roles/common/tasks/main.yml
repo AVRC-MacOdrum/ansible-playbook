@@ -254,6 +254,11 @@
     groups: wheel
     append: yes
     comment: 'Adam Milling'
+  register: add_user_adam
+  
+- name: Delete and expire password for user Adam if Adam just added
+  shell: passwd -d adam && passwd -e adam
+  when: add_user_adam.changed
 
 - name: Install Adam's public key into authorized_keys
   authorized_key:
